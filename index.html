@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>英単語マスター</title>
+    <title>Gemini×英検 無限単語帳</title>
     <style>
-        /* デザイン設定 (CSS) */
+        /* デザイン設定 */
         body {
             font-family: "Helvetica Neue", Arial, sans-serif;
             background-color: #f0f4f8;
@@ -21,57 +21,70 @@
         .app-container {
             background-color: white;
             width: 100%;
-            max-width: 500px;
+            max-width: 600px;
             padding: 2rem;
             border-radius: 15px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.1);
             text-align: center;
         }
-        h1 { color: #2c3e50; margin-bottom: 1.5rem; font-size: 1.5rem; }
+        h1 { color: #2c3e50; margin-bottom: 1rem; font-size: 1.5rem; }
         .hidden { display: none; }
         
-        /* フォーム要素 */
+        /* 入力フォーム */
         .form-group { margin-bottom: 1.5rem; text-align: left; }
         label { display: block; margin-bottom: 0.5rem; font-weight: bold; }
-        select, input[type="number"] {
+        input[type="password"], input[type="text"], select {
             width: 100%;
-            padding: 10px;
+            padding: 12px;
             border: 1px solid #ddd;
-            border-radius: 5px;
+            border-radius: 8px;
             font-size: 1rem;
+            box-sizing: border-box;
         }
-        .radio-group { display: flex; gap: 15px; }
-        .radio-label { font-weight: normal; cursor: pointer; }
-
+        
         /* ボタン */
         .btn {
             background-color: #3498db;
             color: white;
             border: none;
-            padding: 12px 24px;
-            border-radius: 25px;
-            font-size: 1rem;
+            padding: 14px 24px;
+            border-radius: 30px;
+            font-size: 1.1rem;
             cursor: pointer;
             width: 100%;
+            font-weight: bold;
             transition: background 0.2s;
-            margin-top: 10px;
         }
         .btn:hover { background-color: #2980b9; }
-        
+        .btn:disabled { background-color: #bdc3c7; cursor: not-allowed; }
+
+        /* ロード中アニメーション */
+        .loader {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
         /* クイズ画面 */
-        .progress { color: #7f8c8d; margin-bottom: 1rem; font-size: 0.9rem; }
         .question-box {
             font-size: 2rem;
             font-weight: bold;
             margin: 2rem 0;
-            min-height: 60px;
+            min-height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             color: #2c3e50;
-            word-break: break-all;
         }
         .options-grid {
             display: grid;
             grid-template-columns: 1fr;
-            gap: 10px;
+            gap: 12px;
         }
         .option-btn {
             background-color: #ecf0f1;
@@ -87,278 +100,227 @@
         .option-btn.correct { background-color: #2ecc71; border-color: #27ae60; color: white; }
         .option-btn.wrong { background-color: #e74c3c; border-color: #c0392b; color: white; }
 
-        /* 結果画面 */
-        .score-display { font-size: 3rem; font-weight: bold; color: #3498db; margin: 1rem 0; }
-        .message { font-size: 1.2rem; margin-bottom: 2rem; }
-        
-        /* 復習リストのデザイン (追加部分) */
-        .review-section {
-            text-align: left;
-            margin-top: 2rem;
-            border-top: 2px solid #f0f4f8;
-            padding-top: 1rem;
-            max-height: 300px;
-            overflow-y: auto;
-        }
-        .review-title {
-            font-weight: bold;
-            color: #e74c3c;
-            margin-bottom: 10px;
-            text-align: center;
-        }
+        /* 結果・復習 */
         .mistake-item {
             background-color: #fff5f5;
             border-left: 4px solid #e74c3c;
             padding: 10px;
             margin-bottom: 8px;
+            text-align: left;
             border-radius: 4px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
         }
-        .mistake-en { font-weight: bold; font-size: 1.1rem; color: #2c3e50; }
-        .mistake-jp { font-size: 0.9rem; color: #555; }
+        .note { font-size: 0.8rem; color: #7f8c8d; margin-top: 5px; }
     </style>
 </head>
 <body>
 
 <div class="app-container">
     <div id="start-screen">
-        <h1>英単語マスター</h1>
+        <h1>🤖 Gemini × 英検単語</h1>
+        <p style="font-size:0.9rem; color:#666;">Geminiがその場で問題を作成します</p>
         
         <div class="form-group">
-            <label>レベル選択</label>
-            <select id="level-select">
-                <option value="standard">標準 (英検2級レベル)</option>
-                <option value="advanced" selected>難関 (英検準1級レベル)</option>
-            </select>
+            <label>Gemini APIキー</label>
+            <input type="password" id="api-key" placeholder="ここにAPIキーを貼り付け">
+            <div class="note">※キーは保存されません。ブラウザ内でのみ使用されます。</div>
         </div>
 
         <div class="form-group">
-            <label>出題モード</label>
-            <div class="radio-group">
-                <label class="radio-label">
-                    <input type="radio" name="mode" value="en_jp" checked> 英 ⇒ 日
-                </label>
-                <label class="radio-label">
-                    <input type="radio" name="mode" value="jp_en"> 日 ⇒ 英
-                </label>
-            </div>
+            <label>学習テーマ（任意）</label>
+            <input type="text" id="topic" value="英検準一級の頻出単語" placeholder="例: ビジネス英語, 医療単語">
         </div>
 
-        <div class="form-group">
-            <label>問題数</label>
-            <select id="count-select">
-                <option value="5">5問</option>
-                <option value="10" selected>10問</option>
-                <option value="20">20問</option>
-            </select>
-        </div>
+        <button class="btn" onclick="fetchQuizData()" id="start-btn">問題を生成してスタート！</button>
+    </div>
 
-        <button class="btn" onclick="startQuiz()">スタート！</button>
+    <div id="loading-screen" class="hidden">
+        <div class="loader"></div>
+        <p>Geminiが問題を考えています...<br>（数秒かかります）</p>
     </div>
 
     <div id="quiz-screen" class="hidden">
-        <div class="progress">Question <span id="current-q">1</span> / <span id="total-q">10</span></div>
-        <div id="question-text" class="question-box">Apple</div>
-        <div id="options-container" class="options-grid">
-            </div>
+        <div style="color:#7f8c8d;">Question <span id="current-q">1</span> / 10</div>
+        <div id="question-text" class="question-box">Loading...</div>
+        <div id="options-container" class="options-grid"></div>
     </div>
 
     <div id="result-screen" class="hidden">
         <h1>結果発表</h1>
-        <div class="score-display"><span id="final-score">0</span> / <span id="final-total">10</span></div>
-        <div id="feedback-message" class="message">Great Job!</div>
+        <div style="font-size: 3rem; font-weight: bold; color: #3498db; margin: 1rem 0;">
+            <span id="final-score">0</span> / 10
+        </div>
+        <div id="feedback-message" style="margin-bottom: 2rem;"></div>
         
-        <div id="review-container" class="review-section hidden">
-            <div class="review-title">▼ 間違えた単語の見直し ▼</div>
-            <div id="mistake-list">
-                </div>
+        <div id="review-container" class="hidden" style="margin-top:20px; border-top:1px solid #ddd; padding-top:20px;">
+            <h3 style="color:#e74c3c;">復習リスト</h3>
+            <div id="mistake-list"></div>
         </div>
 
-        <button class="btn" onclick="resetApp()">設定に戻る</button>
+        <button class="btn" onclick="resetApp()">新しい問題を作る</button>
     </div>
 </div>
 
 <script>
-    // --- 単語データ ---
-    const wordDatabase = {
-        standard: [ 
-            { en: "efficient", jp: "効率的な" }, { en: "emphasize", jp: "強調する" },
-            { en: "imply", jp: "ほのめかす" }, { en: "inevitable", jp: "避けられない" },
-            { en: "predict", jp: "予測する" }, { en: "concept", jp: "概念" },
-            { en: "distinct", jp: "明確な" }, { en: "obtain", jp: "入手する" },
-            { en: "vague", jp: "あいまいな" }, { en: "aware", jp: "気づいている" },
-            { en: "enable", jp: "可能にする" }, { en: "regard", jp: "みなす" },
-            { en: "decade", jp: "10年間" }, { en: "aspect", jp: "側面" },
-            { en: "consequence", jp: "結果" }, { en: "potential", jp: "潜在的な" },
-            { en: "indicate", jp: "指し示す" }, { en: "feature", jp: "特徴" },
-            { en: "complex", jp: "複雑な" }, { en: "accurate", jp: "正確な" }
-        ],
-        advanced: [ 
-            { en: "vulnerable", jp: "傷つきやすい" }, { en: "scrutinize", jp: "入念に調べる" },
-            { en: "plausible", jp: "もっともらしい" }, { en: "eradicate", jp: "根絶する" },
-            { en: "concurrent", jp: "同時に起こる" }, { en: "meticulous", jp: "細部にこだわる" },
-            { en: "incentive", jp: "動機付け" }, { en: "apprehensive", jp: "懸念している" },
-            { en: "substantiate", jp: "実証する" }, { en: "repercussion", jp: "影響、反響" },
-            { en: "deteriorate", jp: "悪化する" }, { en: "fluctuate", jp: "変動する" },
-            { en: "ambiguous", jp: "あいまいな" }, { en: "prominent", jp: "著名な、傑出した" },
-            { en: "reconcile", jp: "和解させる" }, { en: "superficial", jp: "表面的な" },
-            { en: "spontaneous", jp: "自発的な" }, { en: "hostile", jp: "敵意のある" },
-            { en: "subtle", jp: "微妙な" }, { en: "profound", jp: "深い、重大な" }
-        ]
-    };
-
-    let currentQuestions = [];
+    // 変数
+    let quizData = [];
     let currentIndex = 0;
     let score = 0;
-    let mode = "en_jp";
-    let isAnswering = false;
-    let mistakes = []; // 間違えた単語を保存する配列
+    let mistakes = [];
 
-    function showScreen(screenId) {
-        document.getElementById('start-screen').classList.add('hidden');
-        document.getElementById('quiz-screen').classList.add('hidden');
-        document.getElementById('result-screen').classList.add('hidden');
-        document.getElementById(screenId).classList.remove('hidden');
+    // 画面切り替え
+    function showScreen(id) {
+        ['start-screen', 'loading-screen', 'quiz-screen', 'result-screen'].forEach(s => {
+            document.getElementById(s).classList.add('hidden');
+        });
+        document.getElementById(id).classList.remove('hidden');
     }
 
-    function startQuiz() {
-        const level = document.getElementById('level-select').value;
-        const count = parseInt(document.getElementById('count-select').value);
-        const radioButtons = document.getElementsByName('mode');
-        
-        mode = Array.from(radioButtons).find(r => r.checked).value;
+    // ★ Gemini APIを呼び出す関数 ★
+    async function fetchQuizData() {
+        const apiKey = document.getElementById('api-key').value.trim();
+        const topic = document.getElementById('topic').value || "英検準一級の頻出単語";
 
-        let sourceList = [...wordDatabase[level]];
-        shuffleArray(sourceList);
-        currentQuestions = sourceList.slice(0, Math.min(count, sourceList.length));
-
-        currentIndex = 0;
-        score = 0;
-        mistakes = []; // ミスリストをリセット
-
-        document.getElementById('total-q').textContent = currentQuestions.length;
-        
-        if (currentQuestions.length === 0) {
-            alert("データがありません。");
+        if (!apiKey) {
+            alert("APIキーを入力してください。");
             return;
         }
 
+        showScreen('loading-screen');
+
+        // Geminiへの命令文 (プロンプト)
+        const prompt = `
+            あなたは英語教師です。以下のテーマに基づいて、4択クイズのデータをJSON形式で10問作成してください。
+            テーマ: "${topic}"
+            
+            【出力フォーマット】
+            JSONの配列のみを出力してください。Markdownの記号（\`\`\`jsonなど）は不要です。
+            各オブジェクトは以下の形式にしてください:
+            {
+                "question": "英単語",
+                "correct": "日本語の正解",
+                "distractors": ["日本語の間違い1", "日本語の間違い2", "日本語の間違い3"]
+            }
+            例:
+            [
+                {"question": "vulnerable", "correct": "傷つきやすい", "distractors": ["頑丈な", "攻撃的な", "裕福な"]},
+                ...
+            ]
+        `;
+
+        try {
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: prompt }] }]
+                })
+            });
+
+            const data = await response.json();
+            
+            if (data.error) {
+                throw new Error(data.error.message);
+            }
+
+            // Geminiの返答からJSON部分を取り出す
+            let text = data.candidates[0].content.parts[0].text;
+            // Markdown記号などを削除してクリーンにする
+            text = text.replace(/```json/g, '').replace(/```/g, '').trim();
+            
+            quizData = JSON.parse(text);
+            
+            // クイズ開始
+            startQuiz();
+
+        } catch (error) {
+            alert("エラーが発生しました: " + error.message);
+            showScreen('start-screen');
+        }
+    }
+
+    function startQuiz() {
+        currentIndex = 0;
+        score = 0;
+        mistakes = [];
         showScreen('quiz-screen');
         loadQuestion();
     }
 
     function loadQuestion() {
-        isAnswering = true;
-        const qData = currentQuestions[currentIndex];
-        const qTextEl = document.getElementById('question-text');
-        const optionsContainer = document.getElementById('options-container');
-        const progressEl = document.getElementById('current-q');
-
-        progressEl.textContent = currentIndex + 1;
-        optionsContainer.innerHTML = "";
-
-        const level = document.getElementById('level-select').value;
-        const fullList = wordDatabase[level].filter(w => w.en !== qData.en);
-        shuffleArray(fullList);
+        const item = quizData[currentIndex];
+        document.getElementById('current-q').textContent = currentIndex + 1;
+        document.getElementById('question-text').textContent = item.question;
         
-        const distractors = fullList.slice(0, 3);
-        let questionText, correctAns;
-
-        if (mode === "en_jp") {
-            questionText = qData.en;
-            correctAns = qData.jp;
-            let options = [qData.jp, ...distractors.map(d => d.jp)];
-            shuffleArray(options);
-            renderOptions(options, correctAns, qData);
-        } else {
-            questionText = qData.jp;
-            correctAns = qData.en;
-            let options = [qData.en, ...distractors.map(d => d.en)];
-            shuffleArray(options);
-            renderOptions(options, correctAns, qData);
-        }
-
-        qTextEl.textContent = questionText;
-    }
-
-    function renderOptions(options, correctAns, wordObject) {
         const container = document.getElementById('options-container');
-        
+        container.innerHTML = '';
+
+        // 正解と不正解を混ぜてシャッフル
+        let options = [item.correct, ...item.distractors];
+        shuffleArray(options);
+
         options.forEach(opt => {
             const btn = document.createElement('button');
             btn.className = 'option-btn';
             btn.textContent = opt;
-            btn.onclick = () => handleAnswer(btn, opt, correctAns, wordObject);
+            btn.onclick = () => handleAnswer(btn, opt, item.correct, item);
             container.appendChild(btn);
         });
     }
 
-    function handleAnswer(btn, selected, correct, wordObject) {
-        if (!isAnswering) return;
-        isAnswering = false;
-
+    function handleAnswer(btn, selected, correct, item) {
         const buttons = document.querySelectorAll('.option-btn');
-        
+        // 全ボタン無効化
+        buttons.forEach(b => b.disabled = true);
+
         if (selected === correct) {
             btn.classList.add('correct');
             score++;
         } else {
             btn.classList.add('wrong');
-            // 間違えたらリストに追加
-            mistakes.push(wordObject);
-
+            mistakes.push(item);
+            // 正解を表示
             buttons.forEach(b => {
-                if (b.textContent === correct) {
-                    b.classList.add('correct');
-                }
+                if (b.textContent === correct) b.classList.add('correct');
             });
         }
 
         setTimeout(() => {
             currentIndex++;
-            if (currentIndex < currentQuestions.length) {
+            if (currentIndex < quizData.length) {
                 loadQuestion();
             } else {
                 showResults();
             }
-        }, 1200);
+        }, 1500);
     }
 
     function showResults() {
         showScreen('result-screen');
         document.getElementById('final-score').textContent = score;
-        document.getElementById('final-total').textContent = currentQuestions.length;
-
-        const msgEl = document.getElementById('feedback-message');
-        const reviewContainer = document.getElementById('review-container');
-        const mistakeListEl = document.getElementById('mistake-list');
         
-        const percentage = (score / currentQuestions.length) * 100;
-
-        // メッセージ判定
-        if (percentage === 100) {
-            msgEl.textContent = "Perfect!! 完璧です！🎉";
-            msgEl.style.color = "#2ecc71";
-            reviewContainer.classList.add('hidden'); // 満点なら復習エリアを隠す
+        const msg = document.getElementById('feedback-message');
+        if (score === 10) {
+            msg.textContent = "完璧です！素晴らしい！🎉";
+            msg.style.color = "#2ecc71";
         } else {
-            msgEl.textContent = "復習して完璧にしましょう！💪";
-            msgEl.style.color = "#e67e22";
-            
-            // 復習リストの生成
-            reviewContainer.classList.remove('hidden');
-            mistakeListEl.innerHTML = ""; // クリア
-            
-            mistakes.forEach(word => {
-                const item = document.createElement('div');
-                item.className = 'mistake-item';
-                item.innerHTML = `
-                    <span class="mistake-en">${word.en}</span>
-                    <span class="mistake-jp">${word.jp}</span>
-                `;
-                mistakeListEl.appendChild(item);
+            msg.textContent = "お疲れ様でした！";
+            msg.style.color = "#333";
+        }
+
+        const reviewDiv = document.getElementById('review-container');
+        const listDiv = document.getElementById('mistake-list');
+        listDiv.innerHTML = '';
+
+        if (mistakes.length > 0) {
+            reviewDiv.classList.remove('hidden');
+            mistakes.forEach(m => {
+                const div = document.createElement('div');
+                div.className = 'mistake-item';
+                div.innerHTML = `<strong>${m.question}</strong> : ${m.correct}`;
+                listDiv.appendChild(div);
             });
+        } else {
+            reviewDiv.classList.add('hidden');
         }
     }
 
