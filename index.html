@@ -15,6 +15,8 @@
             align-items: center;
             min-height: 100vh;
             margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
         }
         .app-container {
             background-color: white;
@@ -52,10 +54,10 @@
             cursor: pointer;
             width: 100%;
             transition: background 0.2s;
+            margin-top: 10px;
         }
         .btn:hover { background-color: #2980b9; }
-        .btn:disabled { background-color: #bdc3c7; cursor: not-allowed; }
-
+        
         /* クイズ画面 */
         .progress { color: #7f8c8d; margin-bottom: 1rem; font-size: 0.9rem; }
         .question-box {
@@ -64,6 +66,7 @@
             margin: 2rem 0;
             min-height: 60px;
             color: #2c3e50;
+            word-break: break-all;
         }
         .options-grid {
             display: grid;
@@ -81,14 +84,40 @@
             transition: all 0.2s;
         }
         .option-btn:hover { background-color: #d5dbdb; }
-        
-        /* 正解・不正解の色 */
         .option-btn.correct { background-color: #2ecc71; border-color: #27ae60; color: white; }
         .option-btn.wrong { background-color: #e74c3c; border-color: #c0392b; color: white; }
 
         /* 結果画面 */
-        .score-display { font-size: 3rem; font-weight: bold; color: #3498db; margin: 2rem 0; }
+        .score-display { font-size: 3rem; font-weight: bold; color: #3498db; margin: 1rem 0; }
         .message { font-size: 1.2rem; margin-bottom: 2rem; }
+        
+        /* 復習リストのデザイン (追加部分) */
+        .review-section {
+            text-align: left;
+            margin-top: 2rem;
+            border-top: 2px solid #f0f4f8;
+            padding-top: 1rem;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .review-title {
+            font-weight: bold;
+            color: #e74c3c;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+        .mistake-item {
+            background-color: #fff5f5;
+            border-left: 4px solid #e74c3c;
+            padding: 10px;
+            margin-bottom: 8px;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .mistake-en { font-weight: bold; font-size: 1.1rem; color: #2c3e50; }
+        .mistake-jp { font-size: 0.9rem; color: #555; }
     </style>
 </head>
 <body>
@@ -140,67 +169,53 @@
         <h1>結果発表</h1>
         <div class="score-display"><span id="final-score">0</span> / <span id="final-total">10</span></div>
         <div id="feedback-message" class="message">Great Job!</div>
-        <button class="btn" onclick="resetApp()">もう一度挑戦する</button>
+        
+        <div id="review-container" class="review-section hidden">
+            <div class="review-title">▼ 間違えた単語の見直し ▼</div>
+            <div id="mistake-list">
+                </div>
+        </div>
+
+        <button class="btn" onclick="resetApp()">設定に戻る</button>
     </div>
 </div>
 
 <script>
-    // --- 単語データ (拡張可能です) ---
+    // --- 単語データ ---
     const wordDatabase = {
-        standard: [ // 英検2級程度
-            { en: "efficient", jp: "効率的な" },
-            { en: "emphasize", jp: "強調する" },
-            { en: "imply", jp: "ほのめかす" },
-            { en: "inevitable", jp: "避けられない" },
-            { en: "predict", jp: "予測する" },
-            { en: "concept", jp: "概念" },
-            { en: "distinct", jp: "明確な" },
-            { en: "obtain", jp: "入手する" },
-            { en: "vague", jp: "あいまいな" },
-            { en: "aware", jp: "気づいている" },
-            { en: "enable", jp: "可能にする" },
-            { en: "regard", jp: "みなす" },
-            { en: "decade", jp: "10年間" },
-            { en: "aspect", jp: "側面" },
-            { en: "consequence", jp: "結果" },
-            { en: "potential", jp: "潜在的な" },
-            { en: "indicate", jp: "指し示す" },
-            { en: "feature", jp: "特徴" },
-            { en: "complex", jp: "複雑な" },
-            { en: "accurate", jp: "正確な" }
+        standard: [ 
+            { en: "efficient", jp: "効率的な" }, { en: "emphasize", jp: "強調する" },
+            { en: "imply", jp: "ほのめかす" }, { en: "inevitable", jp: "避けられない" },
+            { en: "predict", jp: "予測する" }, { en: "concept", jp: "概念" },
+            { en: "distinct", jp: "明確な" }, { en: "obtain", jp: "入手する" },
+            { en: "vague", jp: "あいまいな" }, { en: "aware", jp: "気づいている" },
+            { en: "enable", jp: "可能にする" }, { en: "regard", jp: "みなす" },
+            { en: "decade", jp: "10年間" }, { en: "aspect", jp: "側面" },
+            { en: "consequence", jp: "結果" }, { en: "potential", jp: "潜在的な" },
+            { en: "indicate", jp: "指し示す" }, { en: "feature", jp: "特徴" },
+            { en: "complex", jp: "複雑な" }, { en: "accurate", jp: "正確な" }
         ],
-        advanced: [ // 英検準1級程度
-            { en: "vulnerable", jp: "傷つきやすい" },
-            { en: "scrutinize", jp: "入念に調べる" },
-            { en: "plausible", jp: "もっともらしい" },
-            { en: "eradicate", jp: "根絶する" },
-            { en: "concurrent", jp: "同時に起こる" },
-            { en: "meticulous", jp: "細部にこだわる" },
-            { en: "incentive", jp: "動機付け" },
-            { en: "apprehensive", jp: "懸念している" },
-            { en: "substantiate", jp: "実証する" },
-            { en: "repercussion", jp: "影響、反響" },
-            { en: "deteriorate", jp: "悪化する" },
-            { en: "fluctuate", jp: "変動する" },
-            { en: "ambiguous", jp: "あいまいな" },
-            { en: "prominent", jp: "著名な、傑出した" },
-            { en: "reconcile", jp: "和解させる" },
-            { en: "superficial", jp: "表面的な" },
-            { en: "spontaneous", jp: "自発的な" },
-            { en: "hostile", jp: "敵意のある" },
-            { en: "subtle", jp: "微妙な" },
-            { en: "profound", jp: "深い、重大な" }
+        advanced: [ 
+            { en: "vulnerable", jp: "傷つきやすい" }, { en: "scrutinize", jp: "入念に調べる" },
+            { en: "plausible", jp: "もっともらしい" }, { en: "eradicate", jp: "根絶する" },
+            { en: "concurrent", jp: "同時に起こる" }, { en: "meticulous", jp: "細部にこだわる" },
+            { en: "incentive", jp: "動機付け" }, { en: "apprehensive", jp: "懸念している" },
+            { en: "substantiate", jp: "実証する" }, { en: "repercussion", jp: "影響、反響" },
+            { en: "deteriorate", jp: "悪化する" }, { en: "fluctuate", jp: "変動する" },
+            { en: "ambiguous", jp: "あいまいな" }, { en: "prominent", jp: "著名な、傑出した" },
+            { en: "reconcile", jp: "和解させる" }, { en: "superficial", jp: "表面的な" },
+            { en: "spontaneous", jp: "自発的な" }, { en: "hostile", jp: "敵意のある" },
+            { en: "subtle", jp: "微妙な" }, { en: "profound", jp: "深い、重大な" }
         ]
     };
 
-    // --- アプリの状態管理用変数 ---
     let currentQuestions = [];
     let currentIndex = 0;
     let score = 0;
-    let mode = "en_jp"; // or "jp_en"
-    let isAnswering = false; // 連打防止用
+    let mode = "en_jp";
+    let isAnswering = false;
+    let mistakes = []; // 間違えた単語を保存する配列
 
-    // 画面切り替え用関数
     function showScreen(screenId) {
         document.getElementById('start-screen').classList.add('hidden');
         document.getElementById('quiz-screen').classList.add('hidden');
@@ -208,7 +223,6 @@
         document.getElementById(screenId).classList.remove('hidden');
     }
 
-    // クイズ開始処理
     function startQuiz() {
         const level = document.getElementById('level-select').value;
         const count = parseInt(document.getElementById('count-select').value);
@@ -216,15 +230,13 @@
         
         mode = Array.from(radioButtons).find(r => r.checked).value;
 
-        // 指定レベルの単語リストをコピー
         let sourceList = [...wordDatabase[level]];
-        
-        // シャッフルして指定数だけ取り出す
         shuffleArray(sourceList);
         currentQuestions = sourceList.slice(0, Math.min(count, sourceList.length));
 
         currentIndex = 0;
         score = 0;
+        mistakes = []; // ミスリストをリセット
 
         document.getElementById('total-q').textContent = currentQuestions.length;
         
@@ -237,7 +249,6 @@
         loadQuestion();
     }
 
-    // 問題読み込み・表示
     function loadQuestion() {
         isAnswering = true;
         const qData = currentQuestions[currentIndex];
@@ -246,55 +257,46 @@
         const progressEl = document.getElementById('current-q');
 
         progressEl.textContent = currentIndex + 1;
-        optionsContainer.innerHTML = ""; // 選択肢リセット
+        optionsContainer.innerHTML = "";
 
-        // モードによる出し分け
-        let questionText, correctAns, wrongPool;
-        
-        // 正解以外の単語プールを作る
-        // (現在出題中のレベルの全単語から、今の正解単語を除外したもの)
         const level = document.getElementById('level-select').value;
         const fullList = wordDatabase[level].filter(w => w.en !== qData.en);
         shuffleArray(fullList);
         
-        // ダミー選択肢を3つ取得
         const distractors = fullList.slice(0, 3);
+        let questionText, correctAns;
 
         if (mode === "en_jp") {
             questionText = qData.en;
             correctAns = qData.jp;
-            // 選択肢配列作成 (正解 + ダミー)
             let options = [qData.jp, ...distractors.map(d => d.jp)];
             shuffleArray(options);
-            renderOptions(options, correctAns);
+            renderOptions(options, correctAns, qData);
         } else {
             questionText = qData.jp;
             correctAns = qData.en;
-            // 選択肢配列作成
             let options = [qData.en, ...distractors.map(d => d.en)];
             shuffleArray(options);
-            renderOptions(options, correctAns);
+            renderOptions(options, correctAns, qData);
         }
 
         qTextEl.textContent = questionText;
     }
 
-    // 選択肢ボタンの描画
-    function renderOptions(options, correctAns) {
+    function renderOptions(options, correctAns, wordObject) {
         const container = document.getElementById('options-container');
         
         options.forEach(opt => {
             const btn = document.createElement('button');
             btn.className = 'option-btn';
             btn.textContent = opt;
-            btn.onclick = () => handleAnswer(btn, opt, correctAns);
+            btn.onclick = () => handleAnswer(btn, opt, correctAns, wordObject);
             container.appendChild(btn);
         });
     }
 
-    // 解答判定処理
-    function handleAnswer(btn, selected, correct) {
-        if (!isAnswering) return; // 連打防止
+    function handleAnswer(btn, selected, correct, wordObject) {
+        if (!isAnswering) return;
         isAnswering = false;
 
         const buttons = document.querySelectorAll('.option-btn');
@@ -304,7 +306,9 @@
             score++;
         } else {
             btn.classList.add('wrong');
-            // 正解のボタンを緑にする
+            // 間違えたらリストに追加
+            mistakes.push(wordObject);
+
             buttons.forEach(b => {
                 if (b.textContent === correct) {
                     b.classList.add('correct');
@@ -312,7 +316,6 @@
             });
         }
 
-        // 少し待って次の問題へ
         setTimeout(() => {
             currentIndex++;
             if (currentIndex < currentQuestions.length) {
@@ -320,36 +323,49 @@
             } else {
                 showResults();
             }
-        }, 1200); // 1.2秒後に次へ
+        }, 1200);
     }
 
-    // 結果表示
     function showResults() {
         showScreen('result-screen');
         document.getElementById('final-score').textContent = score;
         document.getElementById('final-total').textContent = currentQuestions.length;
 
         const msgEl = document.getElementById('feedback-message');
+        const reviewContainer = document.getElementById('review-container');
+        const mistakeListEl = document.getElementById('mistake-list');
+        
         const percentage = (score / currentQuestions.length) * 100;
 
+        // メッセージ判定
         if (percentage === 100) {
             msgEl.textContent = "Perfect!! 完璧です！🎉";
             msgEl.style.color = "#2ecc71";
-        } else if (percentage >= 80) {
-            msgEl.textContent = "Great job! あと少し！👍";
-            msgEl.style.color = "#3498db";
+            reviewContainer.classList.add('hidden'); // 満点なら復習エリアを隠す
         } else {
-            msgEl.textContent = "Keep going! 復習しましょう💪";
+            msgEl.textContent = "復習して完璧にしましょう！💪";
             msgEl.style.color = "#e67e22";
+            
+            // 復習リストの生成
+            reviewContainer.classList.remove('hidden');
+            mistakeListEl.innerHTML = ""; // クリア
+            
+            mistakes.forEach(word => {
+                const item = document.createElement('div');
+                item.className = 'mistake-item';
+                item.innerHTML = `
+                    <span class="mistake-en">${word.en}</span>
+                    <span class="mistake-jp">${word.jp}</span>
+                `;
+                mistakeListEl.appendChild(item);
+            });
         }
     }
 
-    // リセット
     function resetApp() {
         showScreen('start-screen');
     }
 
-    // 配列シャッフル用ユーティリティ (Fisher-Yates)
     function shuffleArray(array) {
         for (let i = array.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
