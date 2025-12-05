@@ -134,7 +134,7 @@
 
     <div id="loading-screen" class="hidden">
         <div class="loader"></div>
-        <p>使えるモデルを探しています...<br>（数秒かかります）</p>
+        <p>使えるモデルを自動検索中...<br>（数秒かかります）</p>
     </div>
 
     <div id="quiz-screen" class="hidden">
@@ -184,8 +184,9 @@
             if (data.error) throw new Error(data.error.message);
 
             // コンテンツ生成(generateContent)に対応しているモデルを探す
-            // 優先順位: flash > pro > その他
             const models = data.models || [];
+            
+            // 優先順位: flash > pro > その他
             const validModel = models.find(m => 
                 m.supportedGenerationMethods.includes("generateContent") && m.name.includes("flash")
             ) || models.find(m => 
@@ -197,11 +198,12 @@
             if (!validModel) throw new Error("使えるモデルが見つかりませんでした。");
             
             // "models/gemini-1.5-flash-001" のような正確な名前を返す
+            console.log("Found Model:", validModel.name);
             return validModel.name; 
 
         } catch (e) {
             console.error(e);
-            // 取得に失敗した場合の最終手段として固定値を返す
+            // 取得に失敗した場合の最終手段として一番安全なものを返す
             return "models/gemini-1.5-flash";
         }
     }
@@ -221,8 +223,7 @@
         try {
             // ステップ1: 自動でモデル名を取得
             const modelName = await getValidModel(apiKey);
-            console.log("Using model:", modelName); // デバッグ用
-
+            
             // ステップ2: クイズ作成の命令
             const prompt = `
                 You are an English teacher. Create 10 multiple-choice vocabulary questions based on the topic: "${topic}".
@@ -265,4 +266,100 @@
         }
     }
 
-    function
+    function startQuiz() {
+        currentIndex = 0;
+        score = 0;
+        mistakes = [];
+        showScreen('quiz-screen');
+        loadQuestion();
+    }
+
+    function loadQuestion() {
+        const item = quizData[currentIndex];
+        document.getElementById('current-q').textContent = currentIndex + 1;
+        document.getElementById('question-text').textContent = item.question;
+        
+        const container = document.getElementById('options-container');
+        container.innerHTML = '';
+
+        let options = [item.correct, ...item.distractors];
+        shuffleArray(options);
+
+        options.forEach(opt => {
+            const btn = document.createElement('button');
+            btn.className = 'option-btn';
+            btn.textContent = opt;
+            btn.onclick = () => handleAnswer(btn, opt, item.correct, item);
+            container.appendChild(btn);
+        });
+    }
+
+    function handleAnswer(btn, selected, correct, item) {
+        const buttons = document.querySelectorAll('.option-btn');
+        buttons.forEach(b => b.disabled = true);
+
+        if (selected === correct) {
+            btn.classList.add('correct');
+            score++;
+        } else {
+            btn.classList.add('wrong');
+            mistakes.push(item);
+            buttons.forEach(b => {
+                if (b.textContent === correct) b.classList.add('correct');
+            });
+        }
+
+        setTimeout(() => {
+            currentIndex++;
+            if (currentIndex < quizData.length) {
+                loadQuestion();
+            } else {
+                showResults();
+            }
+        }, 1500);
+    }
+
+    function showResults() {
+        showScreen('result-screen');
+        document.getElementById('final-score').textContent = score;
+        
+        const msg = document.getElementById('feedback-message');
+        if (score === 10) {
+            msg.textContent = "完璧です！素晴らしい！🎉";
+            msg.style.color = "#2ecc71";
+        } else {
+            msg.textContent = "お疲れ様でした！";
+            msg.style.color = "#333";
+        }
+
+        const reviewDiv = document.getElementById('review-container');
+        const listDiv = document.getElementById('mistake-list');
+        listDiv.innerHTML = '';
+
+        if (mistakes.length > 0) {
+            reviewDiv.classList.remove('hidden');
+            mistakes.forEach(m => {
+                const div = document.createElement('div');
+                div.className = 'mistake-item';
+                div.innerHTML = `<strong>${m.question}</strong> : ${m.correct}`;
+                listDiv.appendChild(div);
+            });
+        } else {
+            reviewDiv.classList.add('hidden');
+        }
+    }
+
+    function resetApp() {
+        showScreen('start-screen');
+    }
+
+    function shuffleArray(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+    }
+</script>
+
+</body>
+</html>
