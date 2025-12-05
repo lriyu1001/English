@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>英単語マスター</title>
+    <style>
+        /* デザイン設定 (CSS) */
+        body {
+            font-family: "Helvetica Neue", Arial, sans-serif;
+            background-color: #f0f4f8;
+            color: #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+        .app-container {
+            background-color: white;
+            width: 100%;
+            max-width: 500px;
+            padding: 2rem;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        h1 { color: #2c3e50; margin-bottom: 1.5rem; font-size: 1.5rem; }
+        .hidden { display: none; }
+        
+        /* フォーム要素 */
+        .form-group { margin-bottom: 1.5rem; text-align: left; }
+        label { display: block; margin-bottom: 0.5rem; font-weight: bold; }
+        select, input[type="number"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 1rem;
+        }
+        .radio-group { display: flex; gap: 15px; }
+        .radio-label { font-weight: normal; cursor: pointer; }
+
+        /* ボタン */
+        .btn {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            font-size: 1rem;
+            cursor: pointer;
+            width: 100%;
+            transition: background 0.2s;
+        }
+        .btn:hover { background-color: #2980b9; }
+        .btn:disabled { background-color: #bdc3c7; cursor: not-allowed; }
+
+        /* クイズ画面 */
+        .progress { color: #7f8c8d; margin-bottom: 1rem; font-size: 0.9rem; }
+        .question-box {
+            font-size: 2rem;
+            font-weight: bold;
+            margin: 2rem 0;
+            min-height: 60px;
+            color: #2c3e50;
+        }
+        .options-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 10px;
+        }
+        .option-btn {
+            background-color: #ecf0f1;
+            color: #2c3e50;
+            border: 2px solid #bdc3c7;
+            padding: 15px;
+            border-radius: 10px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .option-btn:hover { background-color: #d5dbdb; }
+        
+        /* 正解・不正解の色 */
+        .option-btn.correct { background-color: #2ecc71; border-color: #27ae60; color: white; }
+        .option-btn.wrong { background-color: #e74c3c; border-color: #c0392b; color: white; }
+
+        /* 結果画面 */
+        .score-display { font-size: 3rem; font-weight: bold; color: #3498db; margin: 2rem 0; }
+        .message { font-size: 1.2rem; margin-bottom: 2rem; }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <div id="start-screen">
+        <h1>英単語マスター</h1>
+        
+        <div class="form-group">
+            <label>レベル選択</label>
+            <select id="level-select">
+                <option value="standard">標準 (英検2級レベル)</option>
+                <option value="advanced" selected>難関 (英検準1級レベル)</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>出題モード</label>
+            <div class="radio-group">
+                <label class="radio-label">
+                    <input type="radio" name="mode" value="en_jp" checked> 英 ⇒ 日
+                </label>
+                <label class="radio-label">
+                    <input type="radio" name="mode" value="jp_en"> 日 ⇒ 英
+                </label>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>問題数</label>
+            <select id="count-select">
+                <option value="5">5問</option>
+                <option value="10" selected>10問</option>
+                <option value="20">20問</option>
+            </select>
+        </div>
+
+        <button class="btn" onclick="startQuiz()">スタート！</button>
+    </div>
+
+    <div id="quiz-screen" class="hidden">
+        <div class="progress">Question <span id="current-q">1</span> / <span id="total-q">10</span></div>
+        <div id="question-text" class="question-box">Apple</div>
+        <div id="options-container" class="options-grid">
+            </div>
+    </div>
+
+    <div id="result-screen" class="hidden">
+        <h1>結果発表</h1>
+        <div class="score-display"><span id="final-score">0</span> / <span id="final-total">10</span></div>
+        <div id="feedback-message" class="message">Great Job!</div>
+        <button class="btn" onclick="resetApp()">もう一度挑戦する</button>
+    </div>
+</div>
+
+<script>
+    // --- 単語データ (拡張可能です) ---
+    const wordDatabase = {
+        standard: [ // 英検2級程度
+            { en: "efficient", jp: "効率的な" },
+            { en: "emphasize", jp: "強調する" },
+            { en: "imply", jp: "ほのめかす" },
+            { en: "inevitable", jp: "避けられない" },
+            { en: "predict", jp: "予測する" },
+            { en: "concept", jp: "概念" },
+            { en: "distinct", jp: "明確な" },
+            { en: "obtain", jp: "入手する" },
+            { en: "vague", jp: "あいまいな" },
+            { en: "aware", jp: "気づいている" },
+            { en: "enable", jp: "可能にする" },
+            { en: "regard", jp: "みなす" },
+            { en: "decade", jp: "10年間" },
+            { en: "aspect", jp: "側面" },
+            { en: "consequence", jp: "結果" },
+            { en: "potential", jp: "潜在的な" },
+            { en: "indicate", jp: "指し示す" },
+            { en: "feature", jp: "特徴" },
+            { en: "complex", jp: "複雑な" },
+            { en: "accurate", jp: "正確な" }
+        ],
+        advanced: [ // 英検準1級程度
+            { en: "vulnerable", jp: "傷つきやすい" },
+            { en: "scrutinize", jp: "入念に調べる" },
+            { en: "plausible", jp: "もっともらしい" },
+            { en: "eradicate", jp: "根絶する" },
+            { en: "concurrent", jp: "同時に起こる" },
+            { en: "meticulous", jp: "細部にこだわる" },
+            { en: "incentive", jp: "動機付け" },
+            { en: "apprehensive", jp: "懸念している" },
+            { en: "substantiate", jp: "実証する" },
+            { en: "repercussion", jp: "影響、反響" },
+            { en: "deteriorate", jp: "悪化する" },
+            { en: "fluctuate", jp: "変動する" },
+            { en: "ambiguous", jp: "あいまいな" },
+            { en: "prominent", jp: "著名な、傑出した" },
+            { en: "reconcile", jp: "和解させる" },
+            { en: "superficial", jp: "表面的な" },
+            { en: "spontaneous", jp: "自発的な" },
+            { en: "hostile", jp: "敵意のある" },
+            { en: "subtle", jp: "微妙な" },
+            { en: "profound", jp: "深い、重大な" }
+        ]
+    };
+
+    // --- アプリの状態管理用変数 ---
+    let currentQuestions = [];
+    let currentIndex = 0;
+    let score = 0;
+    let mode = "en_jp"; // or "jp_en"
+    let isAnswering = false; // 連打防止用
+
+    // 画面切り替え用関数
+    function showScreen(screenId) {
+        document.getElementById('start-screen').classList.add('hidden');
+        document.getElementById('quiz-screen').classList.add('hidden');
+        document.getElementById('result-screen').classList.add('hidden');
+        document.getElementById(screenId).classList.remove('hidden');
+    }
+
+    // クイズ開始処理
+    function startQuiz() {
+        const level = document.getElementById('level-select').value;
+        const count = parseInt(document.getElementById('count-select').value);
+        const radioButtons = document.getElementsByName('mode');
+        
+        mode = Array.from(radioButtons).find(r => r.checked).value;
+
+        // 指定レベルの単語リストをコピー
+        let sourceList = [...wordDatabase[level]];
+        
+        // シャッフルして指定数だけ取り出す
+        shuffleArray(sourceList);
+        currentQuestions = sourceList.slice(0, Math.min(count, sourceList.length));
+
+        currentIndex = 0;
+        score = 0;
+
+        document.getElementById('total-q').textContent = currentQuestions.length;
+        
+        if (currentQuestions.length === 0) {
+            alert("データがありません。");
+            return;
+        }
+
+        showScreen('quiz-screen');
+        loadQuestion();
+    }
+
+    // 問題読み込み・表示
+    function loadQuestion() {
+        isAnswering = true;
+        const qData = currentQuestions[currentIndex];
+        const qTextEl = document.getElementById('question-text');
+        const optionsContainer = document.getElementById('options-container');
+        const progressEl = document.getElementById('current-q');
+
+        progressEl.textContent = currentIndex + 1;
+        optionsContainer.innerHTML = ""; // 選択肢リセット
+
+        // モードによる出し分け
+        let questionText, correctAns, wrongPool;
+        
+        // 正解以外の単語プールを作る
+        // (現在出題中のレベルの全単語から、今の正解単語を除外したもの)
+        const level = document.getElementById('level-select').value;
+        const fullList = wordDatabase[level].filter(w => w.en !== qData.en);
+        shuffleArray(fullList);
+        
+        // ダミー選択肢を3つ取得
+        const distractors = fullList.slice(0, 3);
+
+        if (mode === "en_jp") {
+            questionText = qData.en;
+            correctAns = qData.jp;
+            // 選択肢配列作成 (正解 + ダミー)
+            let options = [qData.jp, ...distractors.map(d => d.jp)];
+            shuffleArray(options);
+            renderOptions(options, correctAns);
+        } else {
+            questionText = qData.jp;
+            correctAns = qData.en;
+            // 選択肢配列作成
+            let options = [qData.en, ...distractors.map(d => d.en)];
+            shuffleArray(options);
+            renderOptions(options, correctAns);
+        }
+
+        qTextEl.textContent = questionText;
+    }
+
+    // 選択肢ボタンの描画
+    function renderOptions(options, correctAns) {
+        const container = document.getElementById('options-container');
+        
+        options.forEach(opt => {
+            const btn = document.createElement('button');
+            btn.className = 'option-btn';
+            btn.textContent = opt;
+            btn.onclick = () => handleAnswer(btn, opt, correctAns);
+            container.appendChild(btn);
+        });
+    }
+
+    // 解答判定処理
+    function handleAnswer(btn, selected, correct) {
+        if (!isAnswering) return; // 連打防止
+        isAnswering = false;
+
+        const buttons = document.querySelectorAll('.option-btn');
+        
+        if (selected === correct) {
+            btn.classList.add('correct');
+            score++;
+        } else {
+            btn.classList.add('wrong');
+            // 正解のボタンを緑にする
+            buttons.forEach(b => {
+                if (b.textContent === correct) {
+                    b.classList.add('correct');
+                }
+            });
+        }
+
+        // 少し待って次の問題へ
+        setTimeout(() => {
+            currentIndex++;
+            if (currentIndex < currentQuestions.length) {
+                loadQuestion();
+            } else {
+                showResults();
+            }
+        }, 1200); // 1.2秒後に次へ
+    }
+
+    // 結果表示
+    function showResults() {
+        showScreen('result-screen');
+        document.getElementById('final-score').textContent = score;
+        document.getElementById('final-total').textContent = currentQuestions.length;
+
+        const msgEl = document.getElementById('feedback-message');
+        const percentage = (score / currentQuestions.length) * 100;
+
+        if (percentage === 100) {
+            msgEl.textContent = "Perfect!! 完璧です！🎉";
+            msgEl.style.color = "#2ecc71";
+        } else if (percentage >= 80) {
+            msgEl.textContent = "Great job! あと少し！👍";
+            msgEl.style.color = "#3498db";
+        } else {
+            msgEl.textContent = "Keep going! 復習しましょう💪";
+            msgEl.style.color = "#e67e22";
+        }
+    }
+
+    // リセット
+    function resetApp() {
+        showScreen('start-screen');
+    }
+
+    // 配列シャッフル用ユーティリティ (Fisher-Yates)
+    function shuffleArray(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+    }
+</script>
+
+</body>
+</html>
